@@ -8,6 +8,9 @@ venv/
 data/raw/*.json
 data/processed/*.csv
 
+# SQLite database is rebuilt by load.py from the clean CSV
+data/*.db
+
 # OS / editor
 .DS_Store
 .vscode/
