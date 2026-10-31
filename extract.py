@@ -43,7 +43,7 @@ def main() -> None:
     print(f"Saved raw file : {out_file}")
     print(f"Hourly records : {n_records}")
     print(f"Fields         : {', '.join(hourly.keys())}")
-    print("Extract complete. Next step (Day 2): transform.py — clean & validate.")
+    print("Extract complete. Next step: transform.py — clean & validate.")
 
 
 if __name__ == "__main__":
