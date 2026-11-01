@@ -71,6 +71,17 @@ Load complete — safe to re-run, timestamps upsert by key.
 
 **Load design:** schema in `sql/schema.sql` — one row per hour, `timestamp` as PRIMARY KEY, CHECK constraints mirroring the Day 2 quality rules, plus an index on the date for analysis queries. `load.py` upserts with `INSERT OR REPLACE` inside a single transaction, so re-running the pipeline updates existing hours and appends new ones without ever duplicating rows (verified: second run = +0 net new).
 
+### v2 — PostgreSQL loader
+
+The same pipeline can target PostgreSQL instead of SQLite — the stack most real data platforms use:
+
+```bash
+export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/weather"
+python load_postgres.py
+```
+
+`load_postgres.py` reads the identical clean CSV and applies `sql/schema_postgres.sql` (real `TIMESTAMP`/`DOUBLE PRECISION` types, `TIMESTAMPTZ` load stamp), upserting with Postgres's native `INSERT ... ON CONFLICT (timestamp) DO UPDATE` — the same idempotency contract as the SQLite loader. Verified against PostgreSQL 16: first run loaded 168 rows, second run +0 net new, and aggregates match the SQLite database exactly (weekly average 22.39 °C; hottest hour Nov 5, 14:00 at 28.1 °C). Requires `psycopg[binary]` (in `requirements.txt`).
+
 ## Project Structure
 
 ```
@@ -78,8 +89,10 @@ open-data-etl-pipeline/
 ├── extract.py            # Day 1 — download raw data from the API
 ├── transform.py          # Day 2 — clean + data quality checks
 ├── load.py               # Day 3 — load clean CSV into SQLite (idempotent upsert)
+├── load_postgres.py      # v2 — load clean CSV into PostgreSQL (ON CONFLICT upsert)
 ├── sql/
-│   ├── schema.sql            # Day 3 — weather_hourly table + date index
+│   ├── schema.sql            # Day 3 — weather_hourly table + date index (SQLite)
+│   ├── schema_postgres.sql   # v2 — same table, PostgreSQL dialect
 │   └── analysis_queries.sql  # Day 4 — 10 analysis queries (all executed)
 ├── requirements.txt      # pandas (Day 2 onward)
 ├── run_pipeline.sh       # one-command end-to-end run
@@ -98,6 +111,7 @@ open-data-etl-pipeline/
 - [x] **Day 3 — Load:** SQLite schema (timestamp primary key, CHECK constraints, date index) + loader with `INSERT OR REPLACE` upserts — re-runs verified duplicate-free
 - [x] **Day 4 — Analyse:** 10 SQL queries in `sql/analysis_queries.sql` — daily summaries, hottest/coldest hours, diurnal cycle, day-over-day change (LAG), 24 h rolling average, per-day RANK, comfort buckets — all executed against the loaded data, findings below
 - [x] **Day 5 — Polish:** `run_pipeline.sh` one-command runner, findings write-up (below), fresh-copy reproducibility test passed, final documentation
+- [x] **v2 — PostgreSQL target:** `load_postgres.py` + `sql/schema_postgres.sql` — native `ON CONFLICT` upserts, verified on PostgreSQL 16 (168 rows, re-run +0, aggregates match SQLite)
 
 ## Skills Demonstrated
 *Listed only as the corresponding stage is completed.*
@@ -121,7 +135,7 @@ From `sql/analysis_queries.sql`, run against the loaded database:
 
 A complete, reproducible ETL pipeline built in five stages, each independently testable: **extract** raw API data without touching it, **transform** it with pandas under explicit cleaning rules and data-quality checks, **load** it into SQLite with an idempotent upsert design, and **analyse** it with SQL including window functions. The design choices that matter in real data engineering are all here: a raw layer that is never edited, quality checks that fail loudly instead of silently, loads that can be re-run safely, and findings documented next to the code.
 
-**Possible next steps:** swap SQLite for PostgreSQL, add more cities as a dimension table, schedule daily runs (cron/Airflow), or read historical archive data instead of the forecast feed.
+**Possible next steps:** add more cities as a dimension table, schedule daily runs (cron/Airflow), or read historical archive data instead of the forecast feed. (PostgreSQL support from the original list is done — see the v2 loader above.)
 
 ## Author
 **Dhananjoy Mahato** — Final-year BTech CSE, GD Goenka University, Gurugram

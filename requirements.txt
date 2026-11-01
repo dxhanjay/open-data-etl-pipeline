@@ -1,1 +1,4 @@
 pandas>=2.0
+# Only needed for the PostgreSQL loader (load_postgres.py); the SQLite
+# pipeline runs on the standard library + pandas alone.
+psycopg[binary]>=3.1
